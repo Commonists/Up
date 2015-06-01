@@ -1,0 +1,4 @@
+fbot, ft:
+http://commons.wikimedia.org/wiki/User:{{{?}}}
+- Fastily [original source]
+- Rillke [fixing some decompilation glitches, use API login]
