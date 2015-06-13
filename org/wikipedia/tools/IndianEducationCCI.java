@@ -4,12 +4,17 @@ import java.io.BufferedReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import org.wikipedia.Wiki;
+import org.wikipedia.Wiki.LogEntry;
+import org.wikipedia.Wiki.Revision;
+import org.wikipedia.Wiki.User;
 
 public class IndianEducationCCI
 {
@@ -66,7 +71,7 @@ public class IndianEducationCCI
           int ns = enWiki.namespace(title);
           if (ns == 0)
           {
-            Wiki.Revision[] history = enWiki.getPageHistory(title, revision.getTimestamp(), cal);
+            Wiki.Revision[] history = enWiki.getPageHistory(title, revision.getTimestamp(), cal, false);
             if (history.length == 0)
             {
               System.out.println(user + " has contributions prior to the IEP.");
@@ -124,7 +129,7 @@ public class IndianEducationCCI
         
 
         out.write(";Local uploads\n");
-        Wiki.LogEntry[] uploads = enWiki.getLogEntries(null, null, 2147483647, "upload", u, "", 167317762);
+        Wiki.LogEntry[] uploads = enWiki.getLogEntries(null, null, 2147483647, "upload", "", u, "", 167317762);
         Object list = new HashSet(10000);
         for (int i = 0; i < uploads.length; i++) {
           ((HashSet)list).add(uploads[i].getTarget());
@@ -138,7 +143,7 @@ public class IndianEducationCCI
         
 
         out.write(";Commons uploads\n");
-        uploads = commons.getLogEntries(null, null, 2147483647, "upload", u, "", 167317762);
+        uploads = commons.getLogEntries(null, null, 2147483647, "upload", "", u, "", 167317762);
         ((HashSet)list).clear();
         for (int i = 0; i < uploads.length; i++) {
           ((HashSet)list).add(uploads[i].getTarget());

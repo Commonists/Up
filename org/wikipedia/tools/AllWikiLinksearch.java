@@ -8,10 +8,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
 import javax.swing.JOptionPane;
 import javax.swing.ProgressMonitor;
+
 import org.wikipedia.WMFWiki;
 import org.wikipedia.Wiki;
 
@@ -77,7 +80,7 @@ public class AllWikiLinksearch {
                         builder.append("=== Results for ");
                         builder.append(wiki.getDomain());
                         builder.append(" ===\n");
-                        ArrayList[] links = wiki.linksearch("*." + this.domain);
+                        List[] links = wiki.linksearch("*." + this.domain);
                         linknumber = links[0].size();
                         if (linknumber != 0) {
                             for (int i = 0; i < linknumber; ++i) {
