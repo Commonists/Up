@@ -6,7 +6,6 @@ package org.fbot;
 import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.LayoutManager;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -14,12 +13,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Random;
@@ -30,7 +26,6 @@ import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import javax.swing.border.Border;
 import org.wikipedia.Wiki;
 
 public class FbotUtil {
@@ -41,7 +36,7 @@ public class FbotUtil {
         Random r = new Random();
         String s = "";
         for (int i = 0; i < len; ++i) {
-            s = String.valueOf(s) + (char)(r.nextInt(25) + 65);
+            s = s + (char)(r.nextInt(25) + 65);
         }
         return s;
     }
@@ -114,7 +109,7 @@ public class FbotUtil {
         Scanner m = new Scanner(new File(file));
         ArrayList<String> l = new ArrayList<String>();
         while (m.hasNextLine()) {
-            l.add(String.valueOf(prefix) + m.nextLine().trim());
+            l.add(prefix + m.nextLine().trim());
         }
         return l.toArray(new String[0]);
     }
@@ -172,7 +167,7 @@ public class FbotUtil {
         Scanner m = new Scanner(f);
         String s = "";
         while (m.hasNextLine()) {
-            s = String.valueOf(s) + m.nextLine().trim() + "\n";
+            s = s + m.nextLine().trim() + "\n";
         }
         m.close();
         return s.trim();
@@ -184,7 +179,7 @@ public class FbotUtil {
         while (m.hasNextLine()) {
             String b = m.nextLine().trim();
             if (b.length() <= 0) continue;
-            l.add(String.valueOf(prefix) + b);
+            l.add(prefix + b);
         }
         if (ignorelist.length > 0) {
             ArrayList<String> x = new ArrayList<String>();

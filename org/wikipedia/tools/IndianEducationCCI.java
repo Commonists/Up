@@ -4,17 +4,12 @@ import java.io.BufferedReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Map.Entry;
 import org.wikipedia.Wiki;
-import org.wikipedia.Wiki.LogEntry;
-import org.wikipedia.Wiki.Revision;
-import org.wikipedia.Wiki.User;
 
 public class IndianEducationCCI
 {

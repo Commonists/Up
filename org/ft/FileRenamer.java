@@ -3,7 +3,6 @@
  */
 package org.ft;
 
-import java.awt.Component;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -60,7 +59,7 @@ public class FileRenamer {
                 i = (Integer)db.get(date);
                 db.put(date, new Integer(++i));
             }
-            f.renameTo(new File(String.valueOf(bDir) + "/" + base + date + "p" + i + "." + ext));
+            f.renameTo(new File(bDir + "/" + base + date + "p" + i + "." + ext));
         }
     }
 

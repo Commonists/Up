@@ -3,12 +3,10 @@
  */
 package org.wikipedia.tools;
 
-import java.awt.Component;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -37,7 +35,7 @@ public class AllWikiLinksearch {
         String domain = JOptionPane.showInputDialog(null, "Enter domain to search", "All wiki linksearch", 3);
         monitor = new ProgressMonitor(null, "Searching for links to " + domain, null, 0, queue.size());
         monitor.setMillisToPopup(0);
-        out = new FileWriter(String.valueOf(domain) + ".wiki");
+        out = new FileWriter(domain + ".wiki");
         AllWikiLinksearch.writeOutput("*{{LinkSummary|" + domain + "}}\nSearching " + queue.size() + " wikis at " + new Date().toString() + ".\n\n");
         for (int i = 0; i < 3; ++i) {
             new LinksearchThread(domain).start();
