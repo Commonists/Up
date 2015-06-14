@@ -20,7 +20,7 @@ public class GalleryUpdater {
         for (String s : f) {
             try {
                 if (!s.startsWith("File:")) continue;
-                wiki.edit(s, String.valueOf(wiki.getPageText(s)) + "[[Category:Files by Fastily]]", "Adding [[:Category:Files by Fastily]]");
+                wiki.edit(s, wiki.getPageText(s) + "[[Category:Files by Fastily]]", "Adding [[:Category:Files by Fastily]]");
                 continue;
             }
             catch (Throwable e) {

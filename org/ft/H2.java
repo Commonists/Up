@@ -5,7 +5,6 @@ package org.ft;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.PrintStream;
 import java.util.Random;
 import javax.security.auth.login.LoginException;
 import org.fbot.Fbot;
@@ -20,7 +19,7 @@ public class H2 {
         int i = 0;
         for (File f : new File(".").listFiles()) {
             if (!FbotUtil.isUploadable(f.getName())) continue;
-            new Thread(new SmallUpload(f, String.valueOf(base) + i++)).start();
+            new Thread(new SmallUpload(f, base + i++)).start();
         }
     }
 
@@ -31,7 +30,7 @@ public class H2 {
         private String base;
 
         protected SmallUpload(File f, String base) throws FileNotFoundException {
-            this.base = String.valueOf(base) + "cnt";
+            this.base = base + "cnt";
             this.f = f;
             this.wiki = Fbot.wikiFactory("FSII", FbotUtil.buildReasonCollection("px").get("FSII").toCharArray(), "commons.wikimedia.org");
         }
@@ -45,7 +44,7 @@ public class H2 {
                 try {
                     do {
                         FbotUtil.writeByte(this.f.getAbsolutePath(), r.nextInt(129));
-                        this.wiki.upload(this.f, String.valueOf(this.base) + cnt++ + ext, "This upload is part of a test for an application platform I've been developing. This file shall be deleted shortly.\n{{Self|CC-BY-SA-3.0}}\n[[Category:Fastily Test]]", "");
+                        this.wiki.upload(this.f, this.base + cnt++ + ext, "This upload is part of a test for an application platform I've been developing. This file shall be deleted shortly.\n{{Self|CC-BY-SA-3.0}}\n[[Category:Fastily Test]]", "");
                     } while (true);
                 }
                 catch (LoginException e) {

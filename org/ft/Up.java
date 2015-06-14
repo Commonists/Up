@@ -5,14 +5,11 @@ package org.ft;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.LayoutManager;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +31,6 @@ import javax.swing.JSeparator;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
-import javax.swing.border.Border;
 import javax.swing.text.JTextComponent;
 import org.fbot.Fbot;
 import org.fbot.FbotUtil;
@@ -87,7 +83,7 @@ public class Up {
             if (m.get("fname").length() > 0) {
                 String base = m.get("fname");
                 for (int i2 = 0; i2 < fl.length; ++i2) {
-                    filenames[i2] = String.valueOf(base) + " " + i2 + "." + FbotUtil.getFileExt(fl[i2].getName());
+                    filenames[i2] = base + " " + i2 + "." + FbotUtil.getFileExt(fl[i2].getName());
                 }
             } else {
                 for (i = 0; i < fl.length; ++i) {
@@ -121,9 +117,9 @@ public class Up {
         if (fails.size() > 0) {
             String tt = "Failed to Upload:";
             for (String s : fails) {
-                tt = String.valueOf(tt) + "\n" + s;
+                tt = tt + "\n" + s;
             }
-            tt = String.valueOf(tt) + "\nCheck to make sure the pages you tried to were not protected and that you have permission to upload files,";
+            tt = tt + "\nCheck to make sure the pages you tried to were not protected and that you have permission to upload files,";
             JOptionPane.showMessageDialog(null, tt);
         }
         total = 0;
@@ -244,10 +240,10 @@ public class Up {
             String l = this.cat.getText().trim();
             if (l.length() > 0) {
                 for (String s : l.split("\\|{2}")) {
-                    cl = String.valueOf(cl) + "\n[[Category:" + s + "]]";
+                    cl = cl + "\n[[Category:" + s + "]]";
                 }
             }
-            cl = String.valueOf(cl) + "\n[[Category:Uploaded with Up!]]";
+            cl = cl + "\n[[Category:Uploaded with Up!]]";
             d.put("cat", cl);
             d.put("source", this.source.getText().trim());
             d.put("author", this.author.getText().trim());

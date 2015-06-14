@@ -5,7 +5,6 @@ package org.fbot;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginException;
 import org.fbot.Fbot;
@@ -138,7 +137,7 @@ public class MBot {
         private void addText() {
             for (String s : this.l) {
                 try {
-                    this.wiki.edit(s, String.valueOf(MBot.this.reason[1]) + "\n" + this.wiki.getPageText(s), MBot.this.reason[0]);
+                    this.wiki.edit(s, MBot.this.reason[1] + "\n" + this.wiki.getPageText(s), MBot.this.reason[0]);
                     continue;
                 }
                 catch (Throwable e) {

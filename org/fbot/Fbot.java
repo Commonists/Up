@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import javax.security.auth.login.FailedLoginException;
@@ -37,9 +36,7 @@ public class Fbot {
             }
             catch (IOException e) {
                 System.out.println("Encountered IOException.  This was try #" + i);
-                short s = (short)(i + 1);
-                i = s;
-                if (s <= 8) continue;
+                if (++i <= 8) continue;
                 System.exit(1);
                 continue;
             }
@@ -83,11 +80,11 @@ public class Fbot {
     }
 
     public static void dbrDump(String page, String[] list, String headerText, String footerText, Wiki wiki) throws LoginException, IOException {
-        String dump = String.valueOf(headerText) + "  This report last updated as of ~~~~~\n";
+        String dump = headerText + "  This report last updated as of ~~~~~\n";
         for (String s : list) {
-            dump = String.valueOf(dump) + "*[[:" + s + "]]\n";
+            dump = dump + "*[[:" + s + "]]\n";
         }
-        dump = String.valueOf(dump) + "\n" + footerText;
+        dump = dump + "\n" + footerText;
         wiki.edit(page, dump, "Updating list");
     }
 
@@ -125,7 +122,7 @@ public class Fbot {
     public static void addTextList(String[] pages, String text, String summary, Wiki wiki) {
         for (String page : pages) {
             try {
-                wiki.edit(page, String.valueOf(wiki.getPageText(text)) + text, summary);
+                wiki.edit(page, wiki.getPageText(text) + text, summary);
                 continue;
             }
             catch (Throwable e) {
@@ -170,7 +167,7 @@ public class Fbot {
                 } else if (code.equals("upload")) {
                     wiki.upload(new File(page), page, reason, "");
                 } else {
-                    throw new UnsupportedOperationException(String.valueOf(code) + " is not a valid code!");
+                    throw new UnsupportedOperationException(code + " is not a valid code!");
                 }
                 success = true;
                 continue;
@@ -179,9 +176,7 @@ public class Fbot {
                 throw e;
             }
             catch (IOException e) {
-                int n = i;
-                i = (short)(n + 1);
-                if (n > 4) {
+                if (i++ > 4) {
                     throw e;
                 }
                 e.printStackTrace();

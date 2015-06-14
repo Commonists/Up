@@ -16,9 +16,9 @@ public class FbotParse {
     public static String getRedirectsAsRegex(String template, Wiki wiki) throws IOException {
         String r = "(?si)\\{{2}?\\s*?(Template:)??\\s*?(" + FbotParse.namespaceStrip(template);
         for (String str : wiki.whatLinksHere(template, true, 10)) {
-            r = String.valueOf(r) + "|" + FbotParse.namespaceStrip(str);
+            r = r + "|" + FbotParse.namespaceStrip(str);
         }
-        r = String.valueOf(r) + ").*?\\}{2}?";
+        r = r + ").*?\\}{2}?";
         return r;
     }
 
