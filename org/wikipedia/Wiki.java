@@ -3469,14 +3469,20 @@ public class Wiki implements Serializable
         setCookies(connection);
         connection.connect();
         // there should be a better way to do this
+
+        InputStream input = connection.getInputStream();
+        if ("gzip".equals(connection.getContentEncoding()))
+            input = new GZIPInputStream(input);
+
         try(
-        BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
-        ByteArrayOutputStream out = new ByteArrayOutputStream()){
-        int c;
-        while ((c = in.read()) != -1)
-            out.write(c);
-        log(Level.INFO, "getImage", "Successfully retrieved image \"" + title + "\"");
-        return out.toByteArray();
+            BufferedInputStream in = new BufferedInputStream(input);
+            ByteArrayOutputStream out = new ByteArrayOutputStream())
+        {
+            int c;
+            while ((c = in.read()) != -1)
+                out.write(c);
+            log(Level.INFO, "getImage", "Successfully retrieved image \"" + title + "\"");
+            return out.toByteArray();
         }
     }
 
@@ -3516,7 +3522,12 @@ public class Wiki implements Serializable
         setCookies(connection);
         connection.connect();
         // there should be a better way to do this
-		try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
+
+        InputStream input = connection.getInputStream();
+        if ("gzip".equals(connection.getContentEncoding()))
+            input = new GZIPInputStream(input);
+
+        try (BufferedInputStream in = new BufferedInputStream(input);
 			 BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file)))
 		{
 			int c;
@@ -3558,7 +3569,7 @@ public class Wiki implements Serializable
             return null;
         Map<String, Object> metadata = new HashMap<>(30);
 
-        // size, width, height, mime type
+        // size, width, height, sha, mime type
         metadata.put("size", new Integer(parseAttribute(line, "size", 0)));
         metadata.put("width", new Integer(parseAttribute(line, "width", 0)));
         metadata.put("height", new Integer(parseAttribute(line, "height", 0)));
