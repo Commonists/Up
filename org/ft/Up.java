@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -32,6 +33,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.text.JTextComponent;
+
 import org.fbot.Fbot;
 import org.fbot.FbotUtil;
 import org.wikipedia.Wiki;
@@ -40,9 +42,10 @@ public class Up {
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     private static final Wiki wiki = new Wiki("commons.wikimedia.org");
     private static final String text = "== {{int:filedesc}} ==\n{{Information\n|Description=%s\n|Source=%s\n|Date=%s\n|Author=%s\n|Permission=\n|other_versions=\n}}\n\n== {{int:license-header}} ==\n%s\n%s";
-    private static final ArrayList<String> fails = new ArrayList();
-    private static final double version = 0.2;
-    private static final JFrame f = new JFrame("Up! v0.2 - The *Best* Wikimedia Commons Mass Uploader");
+    private static final ArrayList<String> fails = new ArrayList<String>();
+    private static final String VERSION = "v0.2.1";
+    private static final String NAME = "Up! " + VERSION;
+    private static final JFrame f = new JFrame(NAME +" - Wikimedia Commons Mass Uploader");
     private static int cnt = 0;
     private static int total = 0;
     private static JProgressBar b = new JProgressBar();
@@ -53,12 +56,10 @@ public class Up {
     }
 
     public static void main(String[] args) throws Throwable {
-        if (args.length == 1 && args[0].equals("-f")) {
-            Fbot.loginPX(wiki, "FSII");
-        } else {
-            Fbot.guiLogin(wiki);
-        }
-        SwingUtilities.invokeLater(new Runnable(){
+
+        Fbot.guiLogin(wiki);
+
+        SwingUtilities.invokeLater(new Runnable() {
 
             @Override
             public void run() {
@@ -98,7 +99,7 @@ public class Up {
                 }
             }
             for (i = 0; i < fl.length; ++i) {
-                String tt = String.format("== {{int:filedesc}} ==\n{{Information\n|Description=%s\n|Source=%s\n|Date=%s\n|Author=%s\n|Permission=\n|other_versions=\n}}\n\n== {{int:license-header}} ==\n%s\n%s", m.get("desc"), m.get("source"), dates[i], m.get("author"), m.get("lic"), m.get("cat"));
+                String tt = String.format(text, m.get("desc"), m.get("source"), dates[i], m.get("author"), m.get("lic"), m.get("cat"));
                 b.setString("Uploading " + filenames[i] + " (" + ++cnt + " of " + total + ")");
                 try {
                     wiki.upload(fl[i], filenames[i], tt, "");
@@ -129,7 +130,7 @@ public class Up {
     private static void setupAndShowGUI() {
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, 1));
-        p.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Up! v0.2"), BorderFactory.createEmptyBorder(5, 5, 5, 5)));
+        p.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(NAME), BorderFactory.createEmptyBorder(5, 5, 5, 5)));
         JFileChooser fc = new JFileChooser(System.getProperty("user.home"));
         fc.setFileSelectionMode(1);
         fc.setMultiSelectionEnabled(true);
