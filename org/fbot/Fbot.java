@@ -47,15 +47,6 @@ public class Fbot {
         } while (!success);
     }
 
-    public static void loginPX(Wiki wiki, String user) throws FileNotFoundException {
-        HashMap<String, String> c = FbotUtil.buildReasonCollection("./px");
-        String px = c.get(user);
-        if (px == null) {
-            throw new UnsupportedOperationException("Did not find a Username in the specified file matching String value in user param");
-        }
-        Fbot.loginAndSetPrefs(wiki, user, px.toCharArray());
-    }
-
     public static void guiLogin(Wiki wiki) {
         JTextField u = new JTextField(12);
         JPasswordField px = new JPasswordField(12);
