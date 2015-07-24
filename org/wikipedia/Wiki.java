@@ -22,10 +22,12 @@ package org.wikipedia;
 
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.logging.*;
 import java.util.zip.GZIPInputStream;
+
 import javax.security.auth.login.*;
 
 /**
@@ -436,6 +438,11 @@ public class Wiki implements Serializable
     private String protocol = "https://";
     private Level loglevel = Level.ALL;
     private static final Logger logger = Logger.getLogger("wiki");
+    
+    // Store time when the last throttled action was executed
+    private long lastThrottleActionTime = 0;
+    // Store time when next login attempt can be executed
+    private long nextLoginTime = -1;
 
     // retry flag
     private boolean retry = true;
@@ -918,19 +925,36 @@ public class Wiki implements Serializable
     // META STUFF
 
     /**
-     *  Logs in to the wiki. This method is thread-safe. If the specified
-     *  username or password is incorrect, the thread blocks for 20 seconds
-     *  then throws an exception.
+     *  Logs in to the wiki. This method is thread-safe. You can set
+     *  ignoreRateLimit to false (default: true), if you don't want the API
+     *  to take care of throttling due to numerous failed login attempts.
      *
      *  @param username a username
      *  @param password a password (as a char[] due to JPasswordField)
+     *  @param rateLimit makes this call "blocking", i.e. does obey rate limits
      *  @throws FailedLoginException if the login failed due to incorrect
-     *  username and/or password
+     *  username and/or password and/or rate limits; Refer to the Exception's
+     *  message to get the reason
      *  @throws IOException if a network error occurs
      *  @see #logout
      */
-    public synchronized void login(String username, char[] password) throws IOException, FailedLoginException
+    public synchronized void login(String username, char[] password, boolean rateLimit) throws IOException, FailedLoginException
     {
+        if (rateLimit)
+        {
+            long sleepDuration = nextLoginTime - System.currentTimeMillis();
+            if (sleepDuration > 0)
+            {
+                // TODO log sleepDuration?
+                try
+                {
+                    Thread.sleep(sleepDuration);
+                }
+                catch (InterruptedException ignore)
+                {
+                }
+            }
+        }
         // post login request
         username = normalize(username);
         StringBuilder buffer = new StringBuilder(500);
@@ -961,26 +985,71 @@ public class Wiki implements Serializable
         else
         {
             log(Level.WARNING, "login", "Failed to log in as " + username);
-            try
-            {
-                Thread.sleep(20000); // to prevent brute force
-            }
-            catch (InterruptedException e)
-            {
-                // nobody cares
-            }
             // test for some common failure reasons
             if (line.contains("WrongPass") || line.contains("WrongPluginPass"))
                 throw new FailedLoginException("Login failed: incorrect password.");
             else if (line.contains("NotExists"))
                 throw new FailedLoginException("Login failed: user does not exist.");
+            else if (line.contains("Throttled"))
+            {
+                int wait = new Integer(parseAttribute(line, "wait", 0));
+                nextLoginTime = System.currentTimeMillis() + 1000 * wait;
+                throw new FailedLoginException("Login failed: throttled (wait: "
+                    + wait + ")");
+            }
             throw new FailedLoginException("Login failed: unknown reason.");
         }
     }
-    //Enables login while using a string password
+
+    /**
+     *  Logs in to the wiki. This method is thread-safe. You can set
+     *  ignoreRateLimit to false (default: true), if you don't want the API
+     *  to take care of throttling due to numerous failed login attempts.
+     *
+     *  @param username a username
+     *  @param password a string with the password
+     *  @param rateLimit makes this call "blocking", i.e. does obey rate limits
+     *  @throws FailedLoginException if the login failed due to incorrect
+     *  username and/or password and/or rate limits; Refer to the Exception's
+     *  message to get the reason
+     *  @throws IOException if a network error occurs
+     *  @see #logout
+     */
+    public synchronized void login(String username, String password, boolean rateLimit) throws IOException, FailedLoginException
+    {
+        login(username, password.toCharArray(), rateLimit);
+    }
+
+    /**
+     *  Logs in to the wiki. This method is thread-safe.
+     *
+     *  @param username a username
+     *  @param password a string with the password
+     *  @throws FailedLoginException if the login failed due to incorrect
+     *  username and/or password and/or rate limits; Refer to the Exception's
+     *  message to get the reason
+     *  @throws IOException if a network error occurs
+     *  @see #logout
+     */
     public synchronized void login(String username, String password) throws IOException, FailedLoginException
     {
-        login(username,password.toCharArray());
+        login(username, password.toCharArray(), true);
+    }
+
+    /**
+     *  Logs in to the wiki. This method is thread-safe.
+     *
+     *  @param username a username
+     *  @param password a password
+     *  @throws FailedLoginException if the login failed due to incorrect
+     *  username and/or password and/or rate limits; Refer to the Exception's
+     *  message to get the reason
+     *  @throws IOException if a network error occurs
+     *  @see #logout
+     */
+    public synchronized void login(String username, char[] password) throws IOException, FailedLoginException
+    {
+        login(username, password, true);
     }
 
     /**
@@ -1279,7 +1348,7 @@ public class Wiki implements Serializable
      */
     public Map getPageInfo(String page) throws IOException
     {
-        return getPageInfo(new String[] { page } )[0];
+        return getPageInfo(new String[] { page })[0];
     }
 
     /**
@@ -1358,11 +1427,11 @@ public class Wiki implements Serializable
                     String level = parseAttribute(item, "level", z);
                     protectionstate.put(type, level);
                     //if (level != NO_PROTECTION)
-                        String expiry = parseAttribute(item, "expiry", z);
-                        if (expiry.equals("infinity"))
-                            protectionstate.put(type + "expiry", null);
-                        else
-                            protectionstate.put(type + "expiry", timestampToCalendar(expiry, true));
+                    String expiry = parseAttribute(item, "expiry", z);
+                    if (expiry.equals("infinity"))
+                        protectionstate.put(type + "expiry", null);
+                    else
+                        protectionstate.put(type + "expiry", timestampToCalendar(expiry, true));
                     // protected via cascade
                     if (item.contains("source=\""))
                         protectionstate.put("cascadesource", parseAttribute(item, "source", z));
@@ -1502,7 +1571,7 @@ public class Wiki implements Serializable
         }
 
         log(Level.INFO, "namespace", "Successfully retrieved namespace list (" + namespaces.size() + " namespaces)");
-     }
+    }
 
     /**
      *  Determines whether a series of pages exist.
@@ -1731,7 +1800,7 @@ public class Wiki implements Serializable
         // @revised 0.16 to use API edit. No more screenscraping - yay!
         // @revised 0.17 section editing
         // @revised 0.25 optional bot flagging
-        long start = System.currentTimeMillis();
+    	throttle();
 
         // protection and token
         Map info = getPageInfo(title);
@@ -1809,7 +1878,6 @@ public class Wiki implements Serializable
         if (retry)
             log(Level.INFO, "edit", "Successfully edited " + title);
         retry = true;
-        throttle(start);
     }
 
     /**
@@ -1877,7 +1945,7 @@ public class Wiki implements Serializable
      */
     public synchronized void delete(String title, String reason) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
         if (user == null || !user.isAllowedTo("delete"))
             throw new CredentialNotFoundException("Cannot delete: Permission denied");
 
@@ -1924,7 +1992,6 @@ public class Wiki implements Serializable
         if (retry)
             log(Level.INFO, "delete", "Successfully deleted " + title);
         retry = true;
-        throttle(start);
     }
 
     /**
@@ -1941,7 +2008,7 @@ public class Wiki implements Serializable
      */
     public synchronized void undelete(String title, String reason, Revision... revisions) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
         if (user == null || !user.isAllowedTo("undelete"))
             throw new CredentialNotFoundException("Cannot undelete: Permission denied");
 
@@ -1999,7 +2066,6 @@ public class Wiki implements Serializable
         retry = true;
         for (Revision rev : revisions)
             rev.pageDeleted = false;
-        throttle(start);
     }
 
     /**
@@ -2091,9 +2157,9 @@ public class Wiki implements Serializable
         // or      : <cl ns="14" title="Category:Images for cleanup" sortkey=(long string) sortkeyprefix="Borders" hidden="" />
         List<String> categories = new ArrayList<>(750);
         int a, b; // beginIndex and endIndex
-        for ( a = line.indexOf("<cl "); a > 0; a = b )
+        for (a = line.indexOf("<cl "); a > 0; a = b)
         {
-            b = line.indexOf("<cl ", a+1);
+            b = line.indexOf("<cl ", a + 1);
             if (ignoreHidden && line.substring(a, (b > 0 ? b : line.length())).contains("hidden"))
                 continue;
             String category = parseAttribute(line, "title", a);
@@ -2176,7 +2242,7 @@ public class Wiki implements Serializable
      */
     public String[] getLinksOnPage(String title) throws IOException
     {
-    	StringBuilder url = new StringBuilder(query);
+        StringBuilder url = new StringBuilder(query);
         url.append("prop=links&pllimit=max&titles=");
         url.append(URLEncoder.encode(normalize(title), "UTF-8"));
         String plcontinue = null;
@@ -2197,8 +2263,8 @@ public class Wiki implements Serializable
         while (plcontinue != null);
 
         int size = links.size();
-    	log(Level.INFO, "getLinksOnPage", "Successfully retrieved links used on " + title + " (" + size + " links)");
-    	return links.toArray(new String[size]);
+        log(Level.INFO, "getLinksOnPage", "Successfully retrieved links used on " + title + " (" + size + " links)");
+        return links.toArray(new String[size]);
     }
 
     /**
@@ -2211,7 +2277,7 @@ public class Wiki implements Serializable
      */
     public String[] getExternalLinksOnPage(String title) throws IOException
     {
-    	StringBuilder url = new StringBuilder(query);
+        StringBuilder url = new StringBuilder(query);
         url.append("prop=extlinks&ellimit=max&titles=");
         url.append(URLEncoder.encode(normalize(title), "UTF-8"));
         String eloffset = null;
@@ -2236,8 +2302,8 @@ public class Wiki implements Serializable
         while (eloffset != null);
 
         int size = links.size();
-    	log(Level.INFO, "getExternalLinksOnPage", "Successfully retrieved external links used on " + title + " (" + size + " links)");
-    	return links.toArray(new String[size]);
+        log(Level.INFO, "getExternalLinksOnPage", "Successfully retrieved external links used on " + title + " (" + size + " links)");
+        return links.toArray(new String[size]);
     }
 
     /**
@@ -2736,7 +2802,7 @@ public class Wiki implements Serializable
     public synchronized void move(String title, String newTitle, String reason, boolean noredirect, boolean movetalk,
         boolean movesubpages) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
         // check for log in
         if (user == null || !user.isAllowedTo("move"))
         {
@@ -2805,7 +2871,6 @@ public class Wiki implements Serializable
         if (retry)
             log(Level.INFO, "move", "Successfully moved " + title + " to " + newTitle);
         retry = true;
-        throttle(start);
     }
 
     /**
@@ -2838,7 +2903,7 @@ public class Wiki implements Serializable
         if (user == null || !user.isAllowedTo("protect"))
             throw new CredentialNotFoundException("Cannot protect: permission denied.");
 
-        long start = System.currentTimeMillis();
+        throttle();
         Map info = getPageInfo(page);
         String protectToken = (String)info.get("token");
 
@@ -2898,7 +2963,6 @@ public class Wiki implements Serializable
         if (retry)
             log(Level.INFO, "edit", "Successfully protected " + page);
         retry = true;
-        throttle(start);
     }
 
     /**
@@ -2949,7 +3013,7 @@ public class Wiki implements Serializable
      */
     public Revision getRevision(long oldid) throws IOException
     {
-        return getRevisions( new long[] { oldid })[0];
+        return getRevisions(new long[] { oldid })[0];
     }
 
     /**
@@ -3132,7 +3196,7 @@ public class Wiki implements Serializable
     public synchronized void revisionDelete(Boolean hidecontent, Boolean hideuser, Boolean hidereason, String reason, Boolean suppress,
         Revision[] revisions) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
 
         if (user == null || !user.isAllowedTo("deleterevision") || !user.isAllowedTo("deletelogentry"))
             throw new CredentialNotFoundException("Permission denied: cannot revision delete.");
@@ -3212,7 +3276,6 @@ public class Wiki implements Serializable
             if (hidereason != null)
                 rev.summaryDeleted = hidereason;
         }
-        throttle(start);
     }
 
     /**
@@ -3254,8 +3317,7 @@ public class Wiki implements Serializable
     public synchronized void undo(Revision rev, Revision to, String reason, boolean minor,
         boolean bot) throws IOException, LoginException
     {
-        // throttle
-        long start = System.currentTimeMillis();
+        throttle();
 
         // check here to see whether the titles correspond
         if (to != null && !rev.getPage().equals(to.getPage()))
@@ -3323,7 +3385,6 @@ public class Wiki implements Serializable
             log(Level.INFO, "undo", log);
         }
         retry = true;
-        throttle(start);
     }
 
     /**
@@ -3449,35 +3510,14 @@ public class Wiki implements Serializable
     @Deprecated
     public byte[] getImage(String title, int width, int height) throws IOException
     {
-        // this is a two step process - first we fetch the image url
-        title = title.replaceFirst("^(File|Image|" + namespaceIdentifier(FILE_NAMESPACE) + "):", "");
-        StringBuilder url = new StringBuilder(query);
-        url.append("prop=imageinfo&iiprop=url&titles=");
-        url.append(URLEncoder.encode(normalize("File:" + title), "UTF-8"));
-        url.append("&iiurlwidth=");
-        url.append(width);
-        url.append("&iiurlheight=");
-        url.append(height);
-        String line = fetch(url.toString(), "getImage");
-        if (!line.contains("<imageinfo>"))
-            return null;
-        String url2 = parseAttribute(line, "url", 0);
+        File image = File.createTempFile("wiki-java_getImage", null);
+        image.deleteOnExit();
 
-        // then we use ImageIO to read from it
-        logurl(url2, "getImage");
-        URLConnection connection = makeConnection(url2);
-        setCookies(connection);
-        connection.connect();
-        // there should be a better way to do this
-        try(
-        BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
-        ByteArrayOutputStream out = new ByteArrayOutputStream()){
-        int c;
-        while ((c = in.read()) != -1)
-            out.write(c);
-        log(Level.INFO, "getImage", "Successfully retrieved image \"" + title + "\"");
-        return out.toByteArray();
-        }
+        boolean downloaded = getImage(title, width, height, image);
+        if (!downloaded)
+            return null;
+
+        return Files.readAllBytes(image.toPath());
     }
 
     /**
@@ -3510,22 +3550,27 @@ public class Wiki implements Serializable
             return false;
         String url2 = parseAttribute(line, "url", 0);
 
-        // then we use ImageIO to read from it
+        // then we read the image
         logurl(url2, "getImage");
         URLConnection connection = makeConnection(url2);
         setCookies(connection);
         connection.connect();
+
         // there should be a better way to do this
-		try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
-			 BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file)))
-		{
-			int c;
-			while ((c = in.read()) != -1)
-				outStream.write(c);
-			outStream.flush();
-		}
-		log(Level.INFO, "getImage", "Successfully retrieved image \"" + title + "\"");
-		return true;
+        InputStream input = connection.getInputStream();
+        if ("gzip".equals(connection.getContentEncoding()))
+            input = new GZIPInputStream(input);
+
+        try (BufferedInputStream in = new BufferedInputStream(input);
+            BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file)))
+        {
+            int c;
+            while ((c = in.read()) != -1)
+                outStream.write(c);
+            outStream.flush();
+        }
+        log(Level.INFO, "getImage", "Successfully retrieved image \"" + title + "\"");
+        return true;
     }
 
     /**
@@ -3536,6 +3581,7 @@ public class Wiki implements Serializable
      *  * size (file size, Integer)
      *  * width (Integer)
      *  * height (Integer)
+     *  * sha1 (String)
      *  * mime (MIME type, String)
      *  * plus EXIF metadata (Strings)
      *
@@ -3550,17 +3596,18 @@ public class Wiki implements Serializable
         // TODO: support prop=videoinfo
         // fetch
         file = file.replaceFirst("^(File|Image|" + namespaceIdentifier(FILE_NAMESPACE) + "):", "");
-        String url = query + "prop=imageinfo&iiprop=size%7Cmime%7Cmetadata&titles="
-                + URLEncoder.encode(normalize("File:" + file), "UTF-8");
+        String url = query + "prop=imageinfo&iiprop=size%7Csha1%7Cmime%7Cmetadata&titles="
+            + URLEncoder.encode(normalize("File:" + file), "UTF-8");
         String line = fetch(url, "getFileMetadata");
         if (line.contains("missing=\"\""))
             return null;
         Map<String, Object> metadata = new HashMap<>(30);
 
-        // size, width, height, mime type
+        // size, width, height, sha, mime type
         metadata.put("size", new Integer(parseAttribute(line, "size", 0)));
         metadata.put("width", new Integer(parseAttribute(line, "width", 0)));
         metadata.put("height", new Integer(parseAttribute(line, "height", 0)));
+        metadata.put("sha1", parseAttribute(line, "sha1", 0));
         metadata.put("mime", parseAttribute(line, "mime", 0));
 
         // exif
@@ -3620,7 +3667,7 @@ public class Wiki implements Serializable
     {
         title = title.replaceFirst("^(File|Image|" + namespaceIdentifier(FILE_NAMESPACE) + "):", "");
         String url = query + "prop=imageinfo&iiprop=timestamp%7Cuser%7Ccomment&iilimit=max&titles="
-                + URLEncoder.encode(normalize("File:" + title), "UTF-8");
+            + URLEncoder.encode(normalize("File:" + title), "UTF-8");
         String line = fetch(url, "getImageHistory");
         if (line.contains("missing=\"\""))
             return new LogEntry[0];
@@ -3646,20 +3693,21 @@ public class Wiki implements Serializable
     }
 
     /**
-     *  Gets an old image revision and returns the image data in a <tt>byte[]</tt>.
-     *  You will have to do the thumbnailing yourself.n
+     *  Gets an old image revision and writes the image data in a file.
+     *  Warning: This does overwrite any file content!
+     *  You will have to do the thumbnailing yourself.
      *  @param entry the upload log entry that corresponds to the image being
      *  uploaded
-     *  @return the image data that was uploaded, as long as it exists in the
-     *  local repository (i.e. not on Commons or deleted)
+     *  @param file the file to write the image to
+     *  @return true if the file exists in the local repository (i.e. not on
+     *  Commons or deleted)
+     *  @throws FileNotFoundException if the file is a directory, cannot be created or opened
      *  @throws IOException if a network error occurs
      *  @throws IllegalArgumentException if the entry is not in the upload log
-     *  @since 0.20
+     *  @since 0.30
      */
-    public byte[] getOldImage(LogEntry entry) throws IOException
+    public boolean getOldImage(LogEntry entry, File file) throws IOException
     {
-        // @revised 0.24 BufferedImage => byte[]
-
         // check for type
         if (!entry.getType().equals(UPLOAD_LOG))
             throw new IllegalArgumentException("You must provide an upload log entry!");
@@ -3681,22 +3729,56 @@ public class Wiki implements Serializable
                 URLConnection connection = makeConnection(url);
                 setCookies(connection);
                 connection.connect();
-                // there should be a better way to do this
-                BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                int c;
-                while ((c = in.read()) != -1)
-                    out.write(c);
 
-                // scrape archive name for logging purposes
-                String archive = parseAttribute(line, "archivename", 0);
-                if (archive == null)
-                    archive = title;
-                log(Level.INFO, "getOldImage", "Successfully retrieved old image \"" + archive + "\"");
-                return out.toByteArray();
+                // there should be a better way to do this
+                InputStream input = connection.getInputStream();
+                if ("gzip".equals(connection.getContentEncoding()))
+                    input = new GZIPInputStream(input);
+
+                try (BufferedInputStream in = new BufferedInputStream(input);
+                    BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file)))
+                {
+                    int c;
+                    while ((c = in.read()) != -1)
+                        outStream.write(c);
+                    outStream.flush();
+
+                    // scrape archive name for logging purposes
+                    String archive = parseAttribute(line, "archivename", 0);
+                    if (archive == null)
+                        archive = title;
+                    log(Level.INFO, "getOldImage", "Successfully retrieved old image \"" + archive + "\"");
+                    return true;
+                }
             }
         }
-        return null;
+        return false;
+    }
+
+    /**
+     *  Gets an old image revision and returns the image data in a <tt>byte[]</tt>.
+     *  You will have to do the thumbnailing yourself.n
+     *  @param entry the upload log entry that corresponds to the image being
+     *  uploaded
+     *  @return the image data that was uploaded, as long as it exists in the
+     *  local repository (i.e. not on Commons or deleted)
+     *  @deprecated expects a file as additional parameter
+     *  @throws IOException if a network error occurs
+     *  @throws IllegalArgumentException if the entry is not in the upload log
+     *  @since 0.20
+     */
+    @Deprecated
+    public byte[] getOldImage(LogEntry entry) throws IOException
+    {
+        // @revised 0.24 BufferedImage => byte[]
+        File image = File.createTempFile("wiki-java_getOldImage", null);
+        image.deleteOnExit();
+
+        boolean downloaded = getOldImage(entry, image);
+        if (!downloaded)
+            return null;
+
+        return Files.readAllBytes(image.toPath());
     }
 
     /**
@@ -3788,8 +3870,7 @@ public class Wiki implements Serializable
         // TODO: upload via URL
 
         // the usual stuff
-        // throttle
-        long start = System.currentTimeMillis();
+        throttle();
 
         // check for log in
         if (user == null || !user.isAllowedTo("upload"))
@@ -3901,7 +3982,6 @@ public class Wiki implements Serializable
             String response = multipartPost(apiUrl + "action=upload", params, "upload");
             checkErrorsAndUpdateStatus(response, "upload");
         }
-        throttle(start);
         log(Level.INFO, "upload", "Successfully uploaded to File:" + filename + ".");
     }
 
@@ -4180,7 +4260,7 @@ public class Wiki implements Serializable
      */
     public synchronized void emailUser(User user, String message, String subject, boolean emailme) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
 
         // check if blocked, logged in
         if (this.user == null || !this.user.isAllowedTo("sendemail"))
@@ -4219,7 +4299,6 @@ public class Wiki implements Serializable
         checkErrorsAndUpdateStatus(response, "email");
         if (response.contains("error code=\"cantsend\""))
             throw new UnsupportedOperationException("Email is disabled for this wiki or you do not have a confirmed email address.");
-        throttle(start);
         log(Level.INFO, "emailUser", "Successfully emailed " + user.getUsername() + ".");
     }
 
@@ -4235,9 +4314,9 @@ public class Wiki implements Serializable
      */
     public synchronized void unblock(String blockeduser, String reason) throws IOException, LoginException
     {
-        long start = System.currentTimeMillis();
+        throttle();
         if (user == null || !user.isA("sysop"))
-           throw new CredentialNotFoundException("Cannot unblock: permission denied!");
+            throw new CredentialNotFoundException("Cannot unblock: permission denied!");
 
         // fetch token
         String temp = fetch(query + "action=query&meta=tokens", "unblock");
@@ -4281,7 +4360,6 @@ public class Wiki implements Serializable
         if (retry)
             log(Level.INFO, "unblock", "Successfully unblocked " + blockeduser);
         retry = true;
-        throttle(start);
     }
 
     // WATCHLIST METHODS
@@ -4482,7 +4560,7 @@ public class Wiki implements Serializable
                 wl.add(parseRevision(line.substring(i, j), ""));
             }
         }
-        while(wlstart != null);
+        while (wlstart != null);
         int size = wl.size();
         log(Level.INFO, "watchlist", "Successfully retrieved watchlist (" + size + " items)");
         return wl.toArray(new Revision[size]);
@@ -4578,7 +4656,7 @@ public class Wiki implements Serializable
         {
             // connect
             if (!pages.isEmpty())
-                next = "&iucontinue="  + next;
+                next = "&iucontinue=" + next;
             String line = fetch(url + next, "imageUsage");
             next = parseAttribute(line, "iucontinue", 0);
 
@@ -4722,7 +4800,7 @@ public class Wiki implements Serializable
     {
         return getCategoryMembers(name, (subcat ? 1 : 0), new ArrayList<String>(), ns);
     }
-    
+
     /**
      *  Gets the members of a category with maxdepth recursion.
      *
@@ -4759,7 +4837,7 @@ public class Wiki implements Serializable
         url.append("list=categorymembers&cmprop=title&cmlimit=max&cmtitle=");
         url.append(URLEncoder.encode(normalize("Category:" + name), "UTF-8"));
         boolean nocat = ns.length != 0;
-        if (maxdepth>0 && nocat)
+        if (maxdepth > 0 && nocat)
         {
             for (int i = 0; nocat && i < ns.length; i++)
                 nocat = (ns[i] != CATEGORY_NAMESPACE);
@@ -5014,7 +5092,7 @@ public class Wiki implements Serializable
         logRecord.append(" entries)");
         log(Level.INFO, "getIPBlockList", logRecord.toString());
         return entries.toArray(new LogEntry[size]);
-     }
+    }
 
     /**
      *  Gets the most recent set of log entries up to the given amount.
@@ -5118,7 +5196,7 @@ public class Wiki implements Serializable
      *  @since 0.08
      */
     public LogEntry[] getLogEntries(Calendar start, Calendar end, int amount, String log, String action,
-            User user, String target, int namespace) throws IOException
+        User user, String target, int namespace) throws IOException
     {
         // construct the query url from the parameters given
         StringBuilder url = new StringBuilder(query);
@@ -5154,7 +5232,7 @@ public class Wiki implements Serializable
         if (user != null)
         {
             url.append("&leuser=");
-             // should already be normalized since we have a User object
+            // should already be normalized since we have a User object
             url.append(URLEncoder.encode(user.getUsername(), "UTF-8"));
         }
         if (!target.isEmpty())
@@ -5838,7 +5916,7 @@ public class Wiki implements Serializable
             iwblcontinue = parseAttribute(line, "iwblcontinue", 0);
 
             // xml form: <iw pageid="24163544" ns="0" title="Elisabeth_of_Wroclaw" iwprefix="pl" iwtitle="Main_Page" />
-            for (int x = line.indexOf("<iw "); x > 0;  x = line.indexOf("<iw ", ++x))
+            for (int x = line.indexOf("<iw "); x > 0; x = line.indexOf("<iw ", ++x))
             {
                 links.add(new String[]
                 {
@@ -5847,7 +5925,7 @@ public class Wiki implements Serializable
                 });
             }
         }
-        while(iwblcontinue != null);
+        while (iwblcontinue != null);
         log(Level.INFO, "getInterWikiBacklinks", "Successfully retrieved interwiki backlinks (" + links.size() + " interwikis)");
         return links.toArray(new String[0][0]);
     }
@@ -7243,7 +7321,7 @@ public class Wiki implements Serializable
         {
             switch (temp[i])
             {
-                // illegal characters
+            // illegal characters
                 case '{':
                 case '}':
                 case '<':
@@ -7265,14 +7343,13 @@ public class Wiki implements Serializable
     /**
      *  Ensures no less than <tt>throttle</tt> milliseconds pass between edits
      *  and other write actions.
-     *  @param start the time at which the write method was entered
      *  @since 0.30
      */
-    private synchronized void throttle(long start)
+    private synchronized void throttle()
     {
         try
         {
-            long time = throttle - System.currentTimeMillis() + start;
+            long time = throttle - System.currentTimeMillis() + lastThrottleActionTime;
             if (time > 0)
                 Thread.sleep(time);
         }
@@ -7280,6 +7357,7 @@ public class Wiki implements Serializable
         {
             // nobody cares
         }
+        this.lastThrottleActionTime = System.currentTimeMillis();
     }
 
     // user rights methods
