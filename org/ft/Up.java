@@ -43,7 +43,7 @@ public class Up {
     private static final Wiki wiki = new Wiki("commons.wikimedia.org");
     private static final String text = "== {{int:filedesc}} ==\n{{Information\n|Description=%s\n|Source=%s\n|Date=%s\n|Author=%s\n|Permission=\n|other_versions=\n}}\n\n== {{int:license-header}} ==\n%s\n%s";
     private static final ArrayList<String> fails = new ArrayList<String>();
-    private static final String VERSION = "v0.2.1";
+    private static final String VERSION = "v0.2.2";
     private static final String NAME = "Up! " + VERSION;
     private static final JFrame f = new JFrame(NAME +" - Wikimedia Commons Mass Uploader");
     private static int cnt = 0;
