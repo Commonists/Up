@@ -43,7 +43,7 @@ public class Up {
     private static final Wiki wiki = new Wiki("commons.wikimedia.org");
     private static final String text = "== {{int:filedesc}} ==\n{{Information\n|Description=%s\n|Source=%s\n|Date=%s\n|Author=%s\n|Permission=\n|other_versions=\n}}\n\n== {{int:license-header}} ==\n%s\n%s";
     private static final ArrayList<String> fails = new ArrayList<String>();
-    private static final String VERSION = "v0.2.2";
+    private static final String VERSION = "v0.2.3";
     private static final String NAME = "Up! " + VERSION;
     private static final JFrame f = new JFrame(NAME +" - Wikimedia Commons Mass Uploader");
     private static int cnt = 0;
@@ -213,8 +213,8 @@ public class Up {
         private JTextArea desc = new JTextArea(3, 20);
         private JTextField fname = new JTextField(20);
         private JTextField source = new JTextField("{{own}}", 20);
-        private JTextField author = new JTextField("~~~", 20);
-        private JTextField lic = new JTextField("{{self|GFDL|cc-by-sa-3.0,2.5,2.0,1.0}}", 20);
+        private JTextField author = new JTextField("[[User:{{subst:REVISIONUSER}}|{{subst:REVISIONUSER}}]]", 20);
+        private JTextField lic = new JTextField("{{self|cc-by-sa-4.0}}", 20);
         private JTextField date = new JTextField(20);
         private File[] files;
         private JPanel p;
